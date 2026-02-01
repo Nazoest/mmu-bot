@@ -12,6 +12,10 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configuration - Read from environment variables for security
 LOGIN_URL = "https://studentportal.mmu.ac.ke/Student%20Login.aspx"

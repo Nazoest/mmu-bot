@@ -15,6 +15,10 @@ import logging
 from datetime import datetime
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configuration - Read from environment variables for security
 LOGIN_URL = "https://studentportal.mmu.ac.ke/Student%20Login.aspx"

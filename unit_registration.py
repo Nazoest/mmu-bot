@@ -13,6 +13,10 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.support.ui import Select
 import time
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configuration - Read from environment variables for security
 LOGIN_URL = "https://studentportal.mmu.ac.ke/Student%20Login.aspx"
