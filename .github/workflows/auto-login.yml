@@ -1,0 +1,55 @@
+name: MMU Portal Auto-Login
+
+# Run every 6 hours
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # At minute 0 past every 6th hour
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  auto-login:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Install Chrome and ChromeDriver
+        run: |
+          # Install Chrome
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          
+          # ChromeDriver is automatically managed by selenium>=4.6.0
+      
+      - name: Run Auto-Login Bot
+        env:
+          MMU_REG_NUMBER: ${{ secrets.MMU_REG_NUMBER }}
+          MMU_PASSWORD: ${{ secrets.MMU_PASSWORD }}
+          MMU_LOGIN_INTERVAL: 1  # Just run once in GitHub Actions
+        run: |
+          echo "Starting MMU Portal Auto-Login Bot..."
+          python student_portal_login.py
+      
+      - name: Upload Logs (if any)
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: login-logs
+          path: |
+            *.log
+            *_source.html
+          retention-days: 7
+          if-no-files-found: ignore

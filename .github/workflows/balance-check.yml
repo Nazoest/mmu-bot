@@ -1,0 +1,52 @@
+name: MMU Portal Balance Check
+
+# Run every 6 hours (offset by 1 hour from auto-login)
+on:
+  schedule:
+    - cron: '0 1,7,13,19 * * *'  # At 1am, 7am, 1pm, 7pm UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  balance-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Install Chrome and ChromeDriver
+        run: |
+          # Install Chrome
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+      
+      - name: Run Balance Check
+        env:
+          MMU_REG_NUMBER: ${{ secrets.MMU_REG_NUMBER }}
+          MMU_PASSWORD: ${{ secrets.MMU_PASSWORD }}
+        run: |
+          echo "Checking account balance..."
+          python student_portal_login.py
+      
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: balance-check-logs
+          path: |
+            *.log
+            *_source.html
+          retention-days: 7
+          if-no-files-found: ignore
