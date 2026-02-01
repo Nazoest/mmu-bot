@@ -41,9 +41,18 @@ if not REGISTRATION_NUMBER or not PASSWORD:
 def setup_driver(headless=False):
     """Initialize and configure the Chrome WebDriver."""
     chrome_options = Options()
+    
     if headless:
+        # Headless mode with CI-compatible flags
         chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1920,1080")
+    else:
+        # Local mode with visible browser
+        chrome_options.add_argument("--start-maximized")
+    
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     
     driver = webdriver.Chrome(options=chrome_options)
