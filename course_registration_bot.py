@@ -12,6 +12,10 @@ from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configuration - Read from environment variables for security
 LOGIN_URL = "https://studentportal.mmu.ac.ke/Student%20Login.aspx"
@@ -430,36 +434,32 @@ def main():
     driver = None
     
     try:
-        print("=" * 80)
+        print("===" * 27)
         print("MMU STUDENT PORTAL - AUTOMATED COURSE REGISTRATION BOT")
-        print("=" * 80)
+        print("===" * 27)
         print("\nThis bot will:")
         print("1. Log into the student portal")
         print("2. Navigate to Unit Registration")
-        print("3. Select registration type")
+        print("3. Select 'Course Registration' type")
         print("4. Load available units")
         print("5. Display units for your review")
-        print("\n" + "=" * 80)
+        print("\n" + "===" * 27)
         
-        # Get user input for registration type
-        print("\n[USER INPUT] Please select registration type:")
-        print("  1. Course Registration")
-        print("  2. Supplementary")
-        print("  3. Retake")
+        # Automatically use "Course Registration" as the registration type
+        selected_reg_type = "Course Registration"
+        print(f"\n[INFO] Registration Type: {selected_reg_type}")
         
-        choice = input("Enter choice (1-3) [default: 1]: ").strip() or "1"
+        # Detect if running in GitHub Actions or CI environment
+        is_ci = os.getenv("CI") == "true" or os.getenv("GITHUB_ACTIONS") == "true"
+        headless_mode = is_ci
         
-        reg_types = {
-            "1": "Course Registration",
-            "2": "Supplementary",
-            "3": "Retake"
-        }
-        
-        selected_reg_type = reg_types.get(choice, "Course Registration")
-        print(f"\n[INFO] Selected: {selected_reg_type}")
+        if is_ci:
+            print("[INFO] Running in CI/GitHub Actions mode (headless)")
+        else:
+            print("[INFO] Running in local mode (with browser UI)")
         
         # Setup browser
-        driver = setup_driver(headless=False)
+        driver = setup_driver(headless=headless_mode)
         
         # Step 1: Login
         if not login_to_portal(driver):
@@ -480,8 +480,11 @@ def main():
         if not click_get_units_button(driver):
             print("\n[WARNING] An error occurred or registration not allowed.")
             print("[INFO] Check the error message above for details.")
-            print("\n[INFO] Browser will remain open for 60 seconds for manual review...")
-            time.sleep(60)
+            
+            # Shorter wait time in CI mode
+            wait_time = 10 if is_ci else 60
+            print(f"\n[INFO] Browser will remain open for {wait_time} seconds for manual review...")
+            time.sleep(wait_time)
             return
         
         # Step 5: Display units and allow registration
@@ -492,8 +495,11 @@ def main():
         register_for_units(driver, auto_register_all=False)
         
         print("\n[INFO] Registration process complete!")
-        print("[INFO] Browser will remain open for 30 seconds...")
-        time.sleep(30)
+        
+        # Shorter wait time in CI mode
+        wait_time = 5 if is_ci else 30
+        print(f"[INFO] Browser will remain open for {wait_time} seconds...")
+        time.sleep(wait_time)
         
     except KeyboardInterrupt:
         print("\n\n[INFO] Script interrupted by user.")

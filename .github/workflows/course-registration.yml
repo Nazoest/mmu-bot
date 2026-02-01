@@ -1,0 +1,166 @@
+name: MMU Course Registration
+
+# Run every 6 hours
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # At minute 0 past every 6th hour
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  course-registration:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Install Chrome and ChromeDriver
+        run: |
+          # Install Chrome
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+      
+      - name: Check Course Registration Status
+        id: check_registration
+        env:
+          MMU_REG_NUMBER: ${{ secrets.MMU_REG_NUMBER }}
+          MMU_PASSWORD: ${{ secrets.MMU_PASSWORD }}
+        run: |
+          echo "Checking course registration availability..."
+          python course_registration_bot.py
+      
+      - name: Send Email Notification (On Success)
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: '✅ MMU Course Registration Check Complete'
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: MMU Bot <${{ secrets.EMAIL_USERNAME }}>
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px; }
+                .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 5px; }
+                .button { display: inline-block; padding: 12px 24px; background: #2196F3; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h2>📚 MMU Course Registration Check</h2>
+                  <p>Automated Status Report</p>
+                </div>
+                
+                <div class="content">
+                  <h3>✅ Registration Check Completed Successfully</h3>
+                  <p>The course registration bot has completed its check.</p>
+                  
+                  <h4>📊 Details:</h4>
+                  <ul>
+                    <li><strong>Status:</strong> Check completed</li>
+                    <li><strong>Time:</strong> ${{ github.event.repository.updated_at }}</li>
+                    <li><strong>Workflow Run:</strong> <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">#${{ github.run_number }}</a></li>
+                  </ul>
+                  
+                  <p><strong>Next Steps:</strong></p>
+                  <ol>
+                    <li>Check the workflow logs for detailed information</li>
+                    <li>If units are available, visit the portal to complete registration</li>
+                  </ol>
+                  
+                  <a href="https://studentportal.mmu.ac.ke/UnitRegistration.aspx" class="button">🔗 Go to Registration Page</a>
+                </div>
+                
+                <div class="footer">
+                  <p><strong>Next Check:</strong> In 6 hours</p>
+                  <p><em>This is an automated report from your MMU Course Registration Bot.</em></p>
+                  <p>🤖 Powered by GitHub Actions</p>
+                </div>
+              </div>
+            </body>
+            </html>
+        continue-on-error: true
+      
+      - name: Send Email Notification (On Failure)
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: '⚠️ MMU Course Registration Check Failed'
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: MMU Bot <${{ secrets.EMAIL_USERNAME }}>
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #FF5722; color: white; padding: 20px; text-align: center; border-radius: 5px; }
+                .content { background: #fff3e0; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #FF9800; }
+                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h2>⚠️ Course Registration Check Failed</h2>
+                </div>
+                
+                <div class="content">
+                  <h3>❌ Check Failed</h3>
+                  <p>The course registration bot encountered an error during execution.</p>
+                  
+                  <h4>📊 Details:</h4>
+                  <ul>
+                    <li><strong>Status:</strong> Failed</li>
+                    <li><strong>Time:</strong> ${{ github.event.repository.updated_at }}</li>
+                    <li><strong>Workflow Run:</strong> <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">#${{ github.run_number }}</a></li>
+                  </ul>
+                  
+                  <p>Please check the workflow logs for more details.</p>
+                </div>
+                
+                <div class="footer">
+                  <p><strong>Next Check:</strong> In 6 hours</p>
+                  <p><em>This is an automated alert from your MMU Course Registration Bot.</em></p>
+                </div>
+              </div>
+            </body>
+            </html>
+        continue-on-error: true
+      
+      - name: Upload Logs and Screenshots
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: course-registration-logs
+          path: |
+            *.log
+            *.html
+          retention-days: 7
+          if-no-files-found: ignore
