@@ -166,7 +166,7 @@ jobs:
       
       - name: Upload Debug Files
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: registration-check-logs
           path: |
