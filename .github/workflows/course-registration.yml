@@ -41,7 +41,14 @@ jobs:
           echo "Checking course registration availability..."
           python course_registration_bot.py
       
-      - name: Parse Registration Output
+      - name: Download Previous State
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: course-registration-state
+          path: ./previous_state
+      
+      - name: Parse Registration Output and Detect Changes
         id: parse_output
         if: always()
         run: |
@@ -52,41 +59,115 @@ jobs:
           import sys
           import os
           
-          try:
-              with open('registration_output.json', 'r') as f:
-                  data = json.load(f)
-              
-              status = data.get('status', 'unknown')
-              message = data.get('message', 'No message')
-              error = data.get('error', '')
-              units = data.get('units', [])
-              
-              # Write outputs
+          def write_multiline_output(key, value):
+              """Safely write multiline output to GITHUB_OUTPUT"""
+              value = str(value).replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                  f.write(f"status={status}\n")
-                  f.write(f"message={message}\n")
-                  f.write(f"error={error or ''}\n")
-                  f.write(f"unit_count={len(units)}\n")
+                  f.write(f"{key}={value}\n")
+          
+          def write_output(key, value):
+              """Write single line output"""
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"{key}={value}\n")
+          
+          try:
+              # Load current state
+              with open('registration_output.json', 'r') as f:
+                  current = json.load(f)
+              
+              # Load previous state if exists
+              previous = None
+              try:
+                  with open('previous_state/registration_output.json', 'r') as f:
+                      previous = json.load(f)
+                  print("Previous state found")
+              except:
+                  print("No previous state found (first run)")
+              
+              # Extract current data
+              status = current.get('status', 'unknown')
+              message = current.get('message', 'No message')
+              error = current.get('error', '')
+              units = current.get('units', [])
+              
+              # Determine if we should notify
+              should_notify = False
+              change_reason = ""
+              
+              if previous is None:
+                  # First run - always notify
+                  should_notify = True
+                  change_reason = "First Check - Course Registration Status"
+                  print("First run detected - will send notification")
+              else:
+                  # Compare with previous state
+                  prev_status = previous.get('status', 'unknown')
+                  prev_units = previous.get('units', [])
+                  prev_error = previous.get('error', '')
                   
-                  # Format units as HTML list items
-                  if units:
-                      units_html = ''.join([f'<li>{unit}</li>' for unit in units])
-                      f.write(f"units_html={units_html}\n")
+                  # Check if status changed
+                  if status != prev_status:
+                      should_notify = True
+                      if status == 'success':
+                          change_reason = "✅ Units Now Available!"
+                      elif status == 'error':
+                          change_reason = "⚠️ Registration Error - Status Changed"
+                      else:
+                          change_reason = "📊 Status Changed"
+                      print(f"Status changed: {prev_status} → {status}")
+                  
+                  # Check if units changed (for success status)
+                  elif status == 'success' and set(units) != set(prev_units):
+                      should_notify = True
+                      unit_diff = len(units) - len(prev_units)
+                      if unit_diff > 0:
+                          change_reason = f"✨ {unit_diff} New Unit(s) Available!"
+                      else:
+                          change_reason = "📝 Available Units Changed"
+                      print(f"Units changed: {len(prev_units)} → {len(units)}")
+                  
+                  # Check if error message changed (for error status)
+                  elif status == 'error' and error != prev_error:
+                      should_notify = True  
+                      change_reason = "⚠️ Different Error - Check Details"
+                      print(f"Error message changed")
+                  
                   else:
-                      f.write("units_html=\n")
-                  
-                  print(f"Status: {status}")
-                  print(f"Message: {message}")
-                  print(f"Units found: {len(units)}")
-                  
+                      should_notify = False
+                      print("No changes detected - skipping notification")
+              
+              # Write outputs (using safe multiline writing)
+              write_output('status', status)
+              write_multiline_output('message', message)
+              write_multiline_output('error', error or '')
+              write_output('unit_count', len(units))
+              write_output('should_notify', 'true' if should_notify else 'false')
+              write_multiline_output('change_reason', change_reason)
+              
+              # Format units as HTML list items
+              if units:
+                  units_html = ''.join([f'<li>{unit}</li>' for unit in units])
+                  write_multiline_output('units_html', units_html)
+              else:
+                  write_output('units_html', '')
+              
+              print(f"Status: {status}")
+              print(f"Message: {message}")
+              print(f"Units found: {len(units)}")
+              print(f"Should notify: {should_notify}")
+              print(f"Change reason: {change_reason}")
+              
           except Exception as e:
               print(f"Error parsing output: {e}")
-              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                  f.write("status=error\n")
-                  f.write(f"message=Failed to parse output: {str(e)}\n")
-                  f.write("error=\n")
-                  f.write("unit_count=0\n")
-                  f.write("units_html=\n")
+              import traceback
+              traceback.print_exc()
+              write_output('status', 'error')
+              write_multiline_output('message', f'Failed to parse output: {str(e)}')
+              write_output('error', '')
+              write_output('unit_count', '0')
+              write_output('units_html', '')
+              write_output('should_notify', 'true')  # Notify on errors
+              write_multiline_output('change_reason', '⚠️ Bot Error - Check Logs')
           PYTHON_SCRIPT
           else
             echo "status=unknown" >> $GITHUB_OUTPUT
@@ -96,15 +177,16 @@ jobs:
             echo "units_html=" >> $GITHUB_OUTPUT
           fi
       
+      
       - name: Send Email with Details
-        if: always()
+        if: steps.parse_output.outputs.should_notify == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: ${{ steps.parse_output.outputs.status == 'success' && '✅ Units Available for Registration!' || steps.parse_output.outputs.status == 'error' && '⚠️ Course Registration Check - Error' || '📊 Course Registration Check Complete' }}
+          subject: ${{ steps.parse_output.outputs.change_reason || '📊 Course Registration Update' }}
           to: ${{ secrets.NOTIFICATION_EMAIL }}
           from: MMU Bot <${{ secrets.EMAIL_USERNAME }}>
           html_body: |
@@ -174,6 +256,15 @@ jobs:
             </body>
             </html>
         continue-on-error: true
+      
+      - name: Save Current State for Next Run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: course-registration-state
+          path: registration_output.json
+          retention-days: 30
+          overwrite: true
       
       - name: Upload Logs and Artifacts
         if: always()
