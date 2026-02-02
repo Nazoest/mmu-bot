@@ -50,6 +50,7 @@ jobs:
             python3 << 'PYTHON_SCRIPT'
           import json
           import sys
+          import os
           
           try:
               with open('registration_output.json', 'r') as f:
