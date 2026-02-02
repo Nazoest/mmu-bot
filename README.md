@@ -2,6 +2,23 @@
 
 This bot automates the login process for the Multimedia University of Kenya (MMU) Student Portal.
 
+## 🚀 Quick Setup for New Users
+
+**Want to use this bot? It's easy!**
+
+1. **Open the setup page:** [setup.html](setup.html) (Download this repo and open the file in your browser)
+2. **Enter your credentials** (MMU registration number, password, and email)
+3. **Follow the step-by-step instructions** to set up automation on GitHub
+4. **Done!** The bot will automatically check course registration every 6 hours
+
+**Benefits:**
+- ✅ Automated course registration checking every 6 hours
+- ✅ Smart email notifications (only when status changes)
+- ✅ Balance tracking and unit registration monitoring  
+- ✅ Completely free (runs on GitHub Actions)
+
+---
+
 ## 📁 Files
 
 - **`student_portal_login.py`** - One-time login with visible browser (for testing)
