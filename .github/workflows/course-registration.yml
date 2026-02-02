@@ -41,15 +41,69 @@ jobs:
           echo "Checking course registration availability..."
           python course_registration_bot.py
       
-      - name: Send Email Notification (On Success)
-        if: success()
+      - name: Parse Registration Output
+        id: parse_output
+        if: always()
+        run: |
+          if [ -f "registration_output.json" ]; then
+            echo "Reading registration output..."
+            python3 << 'PYTHON_SCRIPT'
+          import json
+          import sys
+          
+          try:
+              with open('registration_output.json', 'r') as f:
+                  data = json.load(f)
+              
+              status = data.get('status', 'unknown')
+              message = data.get('message', 'No message')
+              error = data.get('error', '')
+              units = data.get('units', [])
+              
+              # Write outputs
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"status={status}\n")
+                  f.write(f"message={message}\n")
+                  f.write(f"error={error or ''}\n")
+                  f.write(f"unit_count={len(units)}\n")
+                  
+                  # Format units as HTML list items
+                  if units:
+                      units_html = ''.join([f'<li>{unit}</li>' for unit in units])
+                      f.write(f"units_html={units_html}\n")
+                  else:
+                      f.write("units_html=\n")
+                  
+                  print(f"Status: {status}")
+                  print(f"Message: {message}")
+                  print(f"Units found: {len(units)}")
+                  
+          except Exception as e:
+              print(f"Error parsing output: {e}")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("status=error\n")
+                  f.write(f"message=Failed to parse output: {str(e)}\n")
+                  f.write("error=\n")
+                  f.write("unit_count=0\n")
+                  f.write("units_html=\n")
+          PYTHON_SCRIPT
+          else
+            echo "status=unknown" >> $GITHUB_OUTPUT
+            echo "message=Output file not found" >> $GITHUB_OUTPUT
+            echo "error=" >> $GITHUB_OUTPUT
+            echo "unit_count=0" >> $GITHUB_OUTPUT
+            echo "units_html=" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Send Email with Details
+        if: always()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: '✅ MMU Course Registration Check Complete'
+          subject: ${{ steps.parse_output.outputs.status == 'success' && '✅ Units Available for Registration!' || steps.parse_output.outputs.status == 'error' && '⚠️ Course Registration Check - Error' || '📊 Course Registration Check Complete' }}
           to: ${{ secrets.NOTIFICATION_EMAIL }}
           from: MMU Bot <${{ secrets.EMAIL_USERNAME }}>
           html_body: |
@@ -57,44 +111,62 @@ jobs:
             <html>
             <head>
               <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px; }
-                .content { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 5px; }
-                .button { display: inline-block; padding: 12px 24px; background: #2196F3; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f4f4f4; }
+                .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+                .header { background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: white; padding: 30px 20px; text-align: center; }
+                .header.error { background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%); }
+                .header.warning { background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); }
+                .header h2 { margin: 0; font-size: 24px; }
+                .header p { margin: 5px 0 0 0; opacity: 0.9; }
+                .content { padding: 30px; }
+                .status-badge { display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: bold; margin: 15px 0; }
+                .status-success { background: #E8F5E9; color: #2E7D32; }
+                .status-error { background: #FFF3E0; color: #E65100; }
+                .units-box { background: #E3F2FD; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 5px; }
+                .units-box h4 { margin-top: 0; color: #1976D2; }
+                .units-list { list-style: none; padding: 0; margin: 10px 0; }
+                .units-list li { padding: 10px; margin: 5px 0; background: white; border-radius: 5px; border-left: 3px solid #4CAF50; }
+                .error-box { background: #FFF3E0; border-left: 4px solid #FF9800; padding: 20px; margin: 20px 0; border-radius: 5px; }
+                .error-box h4 { margin-top: 0; color: #E65100; }
+                .info-box { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                .button { display: inline-block; padding: 12px 30px; background: #2196F3; color: white !important; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+                .button:hover { background: #1976D2; }
+                .footer { background: #f5f5f5; padding: 20px; text-align: center; font-size: 13px; color: #666; }
+                .highlight { background: #FFF59D; padding: 2px 6px; border-radius: 3px; }
               </style>
             </head>
             <body>
               <div class="container">
-                <div class="header">
+                <div class="header${{ steps.parse_output.outputs.status == 'error' && ' error' || steps.parse_output.outputs.status == 'no_units' && ' warning' || '' }}">
                   <h2>📚 MMU Course Registration Check</h2>
                   <p>Automated Status Report</p>
                 </div>
                 
                 <div class="content">
-                  <h3>✅ Registration Check Completed Successfully</h3>
-                  <p>The course registration bot has completed its check.</p>
+                  <div class="status-badge status-${{ steps.parse_output.outputs.status == 'success' && 'success' || 'error' }}">
+                    ${{ steps.parse_output.outputs.status == 'success' && '✅ SUCCESS' || steps.parse_output.outputs.status == 'error' && '⚠️ ERROR' || '📊 COMPLETE' }}
+                  </div>
                   
-                  <h4>📊 Details:</h4>
-                  <ul>
-                    <li><strong>Status:</strong> Check completed</li>
-                    <li><strong>Time:</strong> ${{ github.event.repository.updated_at }}</li>
-                    <li><strong>Workflow Run:</strong> <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">#${{ github.run_number }}</a></li>
-                  </ul>
+                  <h3>${{ steps.parse_output.outputs.message }}</h3>
                   
-                  <p><strong>Next Steps:</strong></p>
-                  <ol>
-                    <li>Check the workflow logs for detailed information</li>
-                    <li>If units are available, visit the portal to complete registration</li>
-                  </ol>
+                  ${{ steps.parse_output.outputs.unit_count > 0 && format('<div class="units-box"><h4>📖 Available Units ({0} found):</h4><ul class="units-list">{1}</ul><p class="highlight"><strong>⚡ Action Required:</strong> Units are available NOW! Log in to complete your registration.</p></div>', steps.parse_output.outputs.unit_count, steps.parse_output.outputs.units_html) || '' }}
                   
-                  <a href="https://studentportal.mmu.ac.ke/UnitRegistration.aspx" class="button">🔗 Go to Registration Page</a>
+                  ${{ steps.parse_output.outputs.error != '' && format('<div class="error-box"><h4>❌ Error Details:</h4><p>{0}</p><p><em>This usually means registration is not currently allowed or you need to complete a payment.</em></p></div>', steps.parse_output.outputs.error) || '' }}
+                  
+                  <div class="info-box">
+                    <p><strong>🕐 Check Time:</strong> ${{ github.event.repository.updated_at }}</p>
+                    <p><strong>🔄 Workflow:</strong> <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">#${{ github.run_number }}</a></p>
+                    <p><strong>� Next Check:</strong> In 6 hours</p>
+                  </div>
+                  
+                  <center>
+                    <a href="https://studentportal.mmu.ac.ke/UnitRegistration.aspx" class="button">🔗 Go to Registration Portal</a>
+                  </center>
                 </div>
                 
                 <div class="footer">
-                  <p><strong>Next Check:</strong> In 6 hours</p>
-                  <p><em>This is an automated report from your MMU Course Registration Bot.</em></p>
+                  <p><strong>MMU Course Registration Bot</strong></p>
+                  <p>Automated monitoring every 6 hours</p>
                   <p>🤖 Powered by GitHub Actions</p>
                 </div>
               </div>
@@ -102,59 +174,7 @@ jobs:
             </html>
         continue-on-error: true
       
-      - name: Send Email Notification (On Failure)
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: '⚠️ MMU Course Registration Check Failed'
-          to: ${{ secrets.NOTIFICATION_EMAIL }}
-          from: MMU Bot <${{ secrets.EMAIL_USERNAME }}>
-          html_body: |
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: #FF5722; color: white; padding: 20px; text-align: center; border-radius: 5px; }
-                .content { background: #fff3e0; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #FF9800; }
-                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <h2>⚠️ Course Registration Check Failed</h2>
-                </div>
-                
-                <div class="content">
-                  <h3>❌ Check Failed</h3>
-                  <p>The course registration bot encountered an error during execution.</p>
-                  
-                  <h4>📊 Details:</h4>
-                  <ul>
-                    <li><strong>Status:</strong> Failed</li>
-                    <li><strong>Time:</strong> ${{ github.event.repository.updated_at }}</li>
-                    <li><strong>Workflow Run:</strong> <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">#${{ github.run_number }}</a></li>
-                  </ul>
-                  
-                  <p>Please check the workflow logs for more details.</p>
-                </div>
-                
-                <div class="footer">
-                  <p><strong>Next Check:</strong> In 6 hours</p>
-                  <p><em>This is an automated alert from your MMU Course Registration Bot.</em></p>
-                </div>
-              </div>
-            </body>
-            </html>
-        continue-on-error: true
-      
-      - name: Upload Logs and Screenshots
+      - name: Upload Logs and Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -162,5 +182,6 @@ jobs:
           path: |
             *.log
             *.html
+            registration_output.json
           retention-days: 7
           if-no-files-found: ignore

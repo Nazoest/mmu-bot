@@ -436,11 +436,17 @@ def register_for_units(driver, unit_indices=None, auto_register_all=False):
             
     except Exception as e:
         print(f"[ERROR] Registration error: {e}")
-        return False
+        return [] # Return empty list on error
 
 def main():
     """Main execution function."""
     driver = None
+    output_data = {
+        "status": "unknown",
+        "message": "",
+        "units": [],
+        "error": None
+    }
     
     try:
         print("===" * 27)
@@ -473,22 +479,45 @@ def main():
         # Step 1: Login
         if not login_to_portal(driver):
             print("\n[ERROR] Login failed. Exiting...")
+            output_data["status"] = "error"
+            output_data["error"] = "Login failed - Please check credentials"
+            output_data["message"] = "Unable to log into the MMU Student Portal"
             return
         
         # Step 2: Navigate
         if not navigate_to_unit_registration(driver):
             print("\n[ERROR] Navigation failed. Exiting...")
+            output_data["status"] = "error"
+            output_data["error"] = "Navigation failed"
+            output_data["message"] = "Could not navigate to Unit Registration page"
             return
         
         # Step 3: Select registration type
         if not select_registration_type(driver, selected_reg_type):
             print("\n[ERROR] Could not select registration type. Exiting...")
+            output_data["status"] = "error"
+            output_data["error"] = "Registration type selection failed"
+            output_data["message"] = "Could not select Course Registration type"
             return
         
         # Step 4: Click button to load units
         if not click_get_units_button(driver):
             print("\n[WARNING] An error occurred or registration not allowed.")
             print("[INFO] Check the error message above for details.")
+            
+            # Try to capture error from page
+            try:
+                error_elements = driver.find_elements(By.CSS_SELECTOR, ".swal2-content, .alert-danger, .error-message")
+                error_text = " ".join([elem.text.strip() for elem in error_elements if elem.text.strip()])
+                if error_text:
+                    output_data["error"] = error_text
+                else:
+                    output_data["error"] = "Registration not allowed or error occurred while loading units"
+            except:
+                output_data["error"] = "Registration not allowed - check portal for details"
+            
+            output_data["status"] = "error"
+            output_data["message"] = "Could not load units for registration"
             
             # Shorter wait time in CI mode
             wait_time = 10 if is_ci else 60
@@ -501,7 +530,16 @@ def main():
         print("UNITS LOADED - READY FOR REGISTRATION")
         print("=" * 80)
         
-        register_for_units(driver, auto_register_all=False)
+        units = register_for_units(driver, auto_register_all=False)
+        
+        # Save units to output
+        if units:
+            output_data["status"] = "success"
+            output_data["message"] = f"Found {len(units)} units available for registration"
+            output_data["units"] = [u if isinstance(u, str) else u.get('text', str(u)) for u in units] if units else []
+        else:
+            output_data["status"] = "no_units"
+            output_data["message"] = "No units found available for registration"
         
         print("\n[INFO] Registration process complete!")
         
@@ -512,13 +550,27 @@ def main():
         
     except KeyboardInterrupt:
         print("\n\n[INFO] Script interrupted by user.")
+        output_data["status"] = "interrupted"
+        output_data["message"] = "Script interrupted by user"
     except Exception as e:
         print(f"\n[ERROR] An error occurred: {e}")
+        output_data["status"] = "error"
+        output_data["error"] = str(e)
+        output_data["message"] = "An unexpected error occurred"
     finally:
         if driver:
             print("\n[INFO] Closing browser...")
             driver.quit()
             print("[INFO] Done!")
+        
+        # Write output to JSON file for GitHub Actions
+        try:
+            import json
+            with open("registration_output.json", "w") as f:
+                json.dump(output_data, f, indent=2)
+            print(f"[INFO] Output saved to registration_output.json")
+        except Exception as e:
+            print(f"[WARNING] Could not save output file: {e}")
 
 if __name__ == "__main__":
     main()
