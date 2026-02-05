@@ -298,7 +298,9 @@ def login_to_portal(driver):
             return False, "Login failed"
         
         # Step 3: Enter credentials
-        print(f"[INFO] Entering registration number: {REGISTRATION_NUMBER}")
+        # Mask registration number for security - only show first 3 and last 3 characters
+        masked_reg = REGISTRATION_NUMBER[:3] + "***" + REGISTRATION_NUMBER[-3:] if len(REGISTRATION_NUMBER) > 6 else "***"
+        print(f"[INFO] Entering registration number: {masked_reg}")
         registration_field.clear()
         registration_field.send_keys(REGISTRATION_NUMBER)
         
