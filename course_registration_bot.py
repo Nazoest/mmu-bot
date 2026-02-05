@@ -167,7 +167,17 @@ def select_registration_type(driver, reg_type="Course Registration"):
         return False
 
 def click_get_units_button(driver):
-    """Click the 'Get Units To Register' button and check for errors."""
+    """
+    Click the 'Get Units To Register' button and check for errors.
+    Returns tuple: (success, error_category, error_message)
+    
+    Error categories:
+    - 'already_registered': Student has already registered for this semester
+    - 'payment_required': Payment needed before registration
+    - 'registration_closed': Registration period is closed
+    - 'technical_error': Technical issue or unknown error
+    - None: No error (success)
+    """
     try:
         print("\n[INFO] Clicking 'Get Units To Register' button...")
         
@@ -176,6 +186,9 @@ def click_get_units_button(driver):
         
         print("[SUCCESS] Button clicked, checking for errors or loading units...")
         time.sleep(3)  # Wait for response
+        
+        error_title = ""
+        error_content = ""
         
         # Check for SweetAlert error messages (common on this portal)
         try:
@@ -196,14 +209,40 @@ def click_get_units_button(driver):
                     error_content = ""
                 
                 if error_title or error_content:
+                    full_message = f"{error_title}\n\n{error_content}".strip()
+                    
+                    # Print the message
                     print("\n" + "=" * 80)
-                    print("⚠️  ERROR MESSAGE DETECTED")
+                    print("📋 MESSAGE FROM PORTAL")
                     print("=" * 80)
                     if error_title:
                         print(f"\n{error_title}")
                     if error_content:
                         print(f"\n{error_content}")
                     print("\n" + "=" * 80)
+                    
+                    # Categorize the message
+                    message_lower = full_message.lower()
+                    error_category = None
+                    
+                    if "already" in message_lower and "registered" in message_lower:
+                        error_category = "already_registered"
+                        print("\n✅ Status: Already Registered")
+                        print("[INFO] You have already registered units for this semester")
+                    elif "payment" in message_lower or "pay" in message_lower or "fee" in message_lower:
+                        error_category = "payment_required"
+                        print("\n💰 Status: Payment Required")
+                        print("[ACTION] You need to complete payment before registering")
+                    elif "closed" in message_lower or "not allowed" in message_lower or "disabled" in message_lower:
+                        error_category = "registration_closed"
+                        print("\n🔒 Status: Registration Not Allowed")
+                        print("[INFO] Registration is currently closed or not yet open")
+                    else:
+                        error_category = "technical_error"
+                        print("\n⚠️ Status: Portal Message/Error")
+                        print("[INFO] Check the message above for details")
+                    
+                    print("=" * 80)
                     
                     # Close the alert
                     try:
@@ -214,7 +253,7 @@ def click_get_units_button(driver):
                     except:
                         pass
                     
-                    return False  # Error occurred
+                    return (False, error_category, full_message)
         except NoSuchElementException:
             # No SweetAlert, check for other error types
             pass
@@ -230,16 +269,16 @@ def click_get_units_button(driver):
                     print("=" * 80)
                     print(f"\n{error_text}\n")
                     print("=" * 80)
-                    return False
+                    return (False, "technical_error", error_text)
         except:
             pass
         
         time.sleep(2)  # Additional wait for modal or page to load
-        return True
+        return (True, None, None)
         
     except Exception as e:
         print(f"[ERROR] Could not click button: {e}")
-        return False
+        return (False, "technical_error", str(e))
 
 def extract_available_units(driver):
     """Extract and display available units from the modal or page."""
@@ -500,24 +539,34 @@ def main():
             output_data["message"] = "Could not select Course Registration type"
             return
         
+        
         # Step 4: Click button to load units
-        if not click_get_units_button(driver):
-            print("\n[WARNING] An error occurred or registration not allowed.")
-            print("[INFO] Check the error message above for details.")
+        success, error_category, error_message = click_get_units_button(driver)
+        
+        if not success:
+            # Categorize the response based on error type
+            if error_category == "already_registered":
+                output_data["status"] = "already_registered"
+                output_data["message"] = "You have already registered units for this semester"
+                output_data["error"] = error_message
+                print("\n✅ You have already registered for this semester")
+            elif error_category == "payment_required":
+                output_data["status"] = "payment_required"
+                output_data["message"] = "Payment required before registration"
+                output_data["error"] = error_message
+                print("\n💰 Payment is required before you can register")
+            elif error_category == "registration_closed":
+                output_data["status"] = "registration_closed"
+                output_data["message"] = "Registration is not currently allowed"
+                output_data["error"] = error_message
+                print("\n🔒 Registration is currently closed")
+            else:
+                output_data["status"] = "error"
+                output_data["message"] = "Could not load units for registration"
+                output_data["error"] = error_message or "Unknown error occurred"
+                print("\n⚠️ An error occurred")
             
-            # Try to capture error from page
-            try:
-                error_elements = driver.find_elements(By.CSS_SELECTOR, ".swal2-content, .alert-danger, .error-message")
-                error_text = " ".join([elem.text.strip() for elem in error_elements if elem.text.strip()])
-                if error_text:
-                    output_data["error"] = error_text
-                else:
-                    output_data["error"] = "Registration not allowed or error occurred while loading units"
-            except:
-                output_data["error"] = "Registration not allowed - check portal for details"
-            
-            output_data["status"] = "error"
-            output_data["message"] = "Could not load units for registration"
+            print("[INFO] Check the message above for full details")
             
             # Shorter wait time in CI mode
             wait_time = 10 if is_ci else 60
