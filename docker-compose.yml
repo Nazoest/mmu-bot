@@ -1,0 +1,37 @@
+services:
+  mmubot:
+    build: .
+    image: mmubot:latest
+    container_name: mmubot_container
+    restart: unless-stopped
+    # Mount the logs directory so they persist on host
+    volumes:
+      - ./logs:/app/logs
+      # Optional: Mount the source code for development (changes reflect immediately)
+      # - .:/app
+
+      # Environment variables
+      # You can load from a .env file or specify them here
+    env_file:
+      - .env
+
+    # Alternative: Specify directly (not recommended for secrets)
+    # environment:
+    #   - MMU_REG_NUMBER=your_reg_number
+    #   - MMU_PASSWORD=your_password
+    #   - MMU_LOGIN_INTERVAL=45
+
+    # Increase shared memory size for Chrome to prevent crashes
+    shm_size: '2gb'
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      - HEADLESS=true
+
+    command: python course_registration_bot.py

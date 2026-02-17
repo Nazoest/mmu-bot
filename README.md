@@ -12,7 +12,7 @@ This bot automates the login process for the Multimedia University of Kenya (MMU
 4. **Done!** The bot will automatically check course registration every 6 hours
 
 **Benefits:**
-- ✅ Automated course registration checking every 6 hours
+- ✅ Automated course registration checking
 - ✅ Smart email notifications (only when status changes)
 - ✅ Balance tracking and unit registration monitoring  
 - ✅ Completely free (runs on GitHub Actions)
@@ -21,11 +21,7 @@ This bot automates the login process for the Multimedia University of Kenya (MMU
 
 ## 📁 Files
 
-- **`student_portal_login.py`** - One-time login with visible browser (for testing)
-- **`auto_login_background.py`** - Automatic login every 45 minutes in background (headless mode)
-- **`unit_registration.py`** - Extract and display available units from Unit Registration page
 - **`course_registration_bot.py`** - Automated course registration with dropdown selection
-- **`run_background.bat`** - Easy launcher for the background bot
 
 ## Features
 
@@ -33,9 +29,7 @@ This bot automates the login process for the Multimedia University of Kenya (MMU
 - ✅ Clicks the "Student Login" button
 - ✅ Enters your registration number and password
 - ✅ Submits the login form
-- ✅ **NEW**: Auto-login every 45 minutes in background mode (no visible browser)
-- ✅ **NEW**: Logging to file for monitoring
-- ✅ **NEW**: Account balance checking after login
+- ✅ Submits the login form
 - ✅ **NEW**: Unit registration page navigation and unit extraction
 - ✅ **NEW**: Automated course registration with dropdown selection
 - ✅ Handles multiple possible form field identifiers
@@ -66,70 +60,13 @@ This bot automates the login process for the Multimedia University of Kenya (MMU
 
 ## Usage
 
-### Option 1: One-Time Login (Visible Browser)
 
-For testing or manual login:
 
-```bash
-python student_portal_login.py
-```
 
-The script will:
-1. Open Chrome browser
-2. Navigate to the login page
-3. Click "Student Login"
-4. Enter credentials (registration number: `cit-223-101/2023`, password: `nathan115`)
-5. Submit the login form
-6. Keep the browser open for 30 seconds if successful
 
-### Option 2: Automatic Background Login (Recommended)
 
-**For continuous auto-login every 45 minutes in background (no visible browser):**
 
-#### Quick Start (Windows):
-Just double-click: **`run_background.bat`**
-
-#### Or run manually:
-```bash
-python auto_login_background.py
-```
-
-**What it does:**
-- 🔄 Automatically logs in every 45 minutes
-- 👻 Runs in headless mode (no browser window visible)
-- 📝 Saves logs to `mmu_login_bot.log`
-- ♾️ Keeps running until you stop it (Ctrl+C)
-- 🔁 Shows next scheduled login time after each run
-
-**To stop the bot:**
-- Press `Ctrl+C` in the terminal
-- Or close the command window
-
-**To check logs:**
-- Open `mmu_login_bot.log` in the same folder
-- Shows timestamp, status, and any errors for each login attempt
-
-### Option 3: View and Extract Units
-
-**To view available units for registration:**
-
-```bash
-python unit_registration.py
-```
-
-**What it does:**
-- 🔐 Logs into the student portal
-- 📚 Navigates to Unit Registration page
-- 🔍 Extracts available units using multiple detection strategies:
-  - Dropdown/select menus
-  - Unit tables
-  - Checkboxes/radio buttons
-  - Pattern matching for unit codes
-- 📋 Displays all found units in terminal
-- 💾 Saves page source to `unit_registration_page.html` for inspection
-- ⏱️ Keeps browser open for 60 seconds for manual review
-
-### Option 4: Automated Course Registration
+### Automated Course Registration
 
 **To register for courses:**
 
@@ -152,16 +89,7 @@ python course_registration_bot.py
 
 **Safety Notice:** The bot loads and displays units but requires manual confirmation before submitting registration. This prevents accidental registrations.
 
-### Customizing Credentials
 
-To use different credentials, edit the configuration section in `student_portal_login.py`:
-
-```python
-# Configuration
-LOGIN_URL = "https://studentportal.mmu.ac.ke/Student%20Login.aspx"
-REGISTRATION_NUMBER = "your-registration-number"
-PASSWORD = "your-password"
-```
 
 ### Running in Headless Mode
 

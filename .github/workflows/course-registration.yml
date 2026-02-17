@@ -14,32 +14,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+      - name: Build Docker Image
+        run: docker build -t mmubot .
       
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      
-      - name: Install Chrome and ChromeDriver
-        run: |
-          # Install Chrome
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
-      
-      - name: Check Course Registration Status
+      - name: Run Course Registration Check
         id: check_registration
-        env:
-          MMU_REG_NUMBER: ${{ secrets.MMU_REG_NUMBER }}
-          MMU_PASSWORD: ${{ secrets.MMU_PASSWORD }}
         run: |
-          echo "Checking course registration availability..."
-          python course_registration_bot.py
+          echo "Running bot in Docker container..."
+          # Run container with volume mount to get output file back
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -e MMU_REG_NUMBER="${{ secrets.MMU_REG_NUMBER }}" \
+            -e MMU_PASSWORD="${{ secrets.MMU_PASSWORD }}" \
+            -e HEADLESS=true \
+            -e CI=true \
+            mmubot
       
       - name: Download Previous State
         uses: actions/download-artifact@v4

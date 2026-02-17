@@ -42,7 +42,10 @@ def setup_driver(headless=False):
     """Initialize and configure the Chrome WebDriver."""
     chrome_options = Options()
     
-    if headless:
+    # Check for headless mode via argument or env var
+    is_headless = headless or os.getenv("HEADLESS", "false").lower() == "true"
+    
+    if is_headless:
         # Headless mode with CI-compatible flags
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
@@ -53,10 +56,34 @@ def setup_driver(headless=False):
         # Local mode with visible browser
         chrome_options.add_argument("--start-maximized")
     
+    # Set binary location (crucial for Docker where we installed Chromium)
+    chrome_bin = os.getenv("CHROME_BIN") or os.getenv("CHROME_PATH")
+    if chrome_bin:
+        chrome_options.binary_location = chrome_bin
+        print(f"[INFO] Using Chrome binary at: {chrome_bin}")
+
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     
-    driver = webdriver.Chrome(options=chrome_options)
-    return driver
+    try:
+        from selenium.webdriver.chrome.service import Service
+        service = None
+        chromedriver_path = os.getenv("CHROMEDRIVER_PATH")
+        
+        if chromedriver_path:
+             print(f"[INFO] Using ChromeDriver at: {chromedriver_path}")
+             service = Service(executable_path=chromedriver_path)
+        
+        if service:
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        else:
+            driver = webdriver.Chrome(options=chrome_options)
+            
+        return driver
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize WebDriver: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return None
 
 def login_to_portal(driver):
     """Log into the MMU Student Portal."""
